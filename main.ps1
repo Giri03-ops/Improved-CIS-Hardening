@@ -5,7 +5,7 @@
 # Usage:
 #   .\main.ps1                          # Live run (applies changes + creates backups)
 #   .\main.ps1 -WhatIf                  # Audit only — no changes, no backups
-#   .\main.ps1 -WhatIf -SkipCIS 2.3,7.12   # Skip specific controls
+#   .\main.ps1 -WhatIf -SkipCIS '2.3','7.12'   # Skip specific controls
 #
 # Restore IIS after a live run:
 #   & "$env:SystemRoot\System32\inetsrv\appcmd.exe" restore backup "CIS_<timestamp>"
@@ -161,8 +161,22 @@ $manifest = [ordered]@{
 }
 
 # ---------------------------------------------------------------------------
-# 9. Orchestration loop
+# 9. Normalize and validate -SkipCIS input, then orchestration loop
 # ---------------------------------------------------------------------------
+$normalizedSkipCIS = @(
+    $SkipCIS |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { $_.Trim() } |
+        Select-Object -Unique
+)
+
+$invalidSkipCIS = @($normalizedSkipCIS | Where-Object { $manifest.Keys -notcontains $_ })
+if ($invalidSkipCIS.Count -gt 0) {
+    Write-Log "Ignoring invalid -SkipCIS references: $($invalidSkipCIS -join ', ')" -Level Warning
+}
+
+$effectiveSkipCIS = @($normalizedSkipCIS | Where-Object { $manifest.Keys -contains $_ })
+
 $Results = [System.Collections.Generic.List[PSCustomObject]]::new()
 
 foreach ($ref in $manifest.Keys) {
@@ -170,7 +184,7 @@ foreach ($ref in $manifest.Keys) {
     Write-Log "--- CIS $ref : $($entry.Description) ---"
 
     # Skip if user requested
-    if ($SkipCIS -contains $ref) {
+    if ($effectiveSkipCIS -contains $ref) {
         Write-Log "CIS $ref: Skipped (user-requested via -SkipCIS)." -Level Warning
         $Results.Add([PSCustomObject]@{
             CISRef      = $ref

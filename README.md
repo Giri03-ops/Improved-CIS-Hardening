@@ -79,18 +79,20 @@ Use this first to understand the current state before making any changes.
 Skip a single control:
 
 ```powershell
-.\main.ps1 -WhatIf -SkipCIS @('7.12')
+.\main.ps1 -WhatIf -SkipCIS '7.12'
 ```
 
-Skip multiple controls:
+Skip multiple controls (either format works):
 
 ```powershell
+.\main.ps1 -WhatIf -SkipCIS '2.3','7.12'
 .\main.ps1 -WhatIf -SkipCIS @('2.3', '7.12')
 ```
 
 Skipped controls appear in the report as `Skipped`.
 Accepts any combination of CIS reference numbers (e.g. `'1.2'`, `'7.6'`).
 You do **not** need to provide a range — pass only the control IDs you want to skip.
+Invalid CIS references in `-SkipCIS` are ignored with a warning in the log.
 
 ### 3. Live run — applies changes and creates backups
 
@@ -101,7 +103,7 @@ You do **not** need to provide a range — pass only the control IDs you want to
 Live run while skipping selected controls:
 
 ```powershell
-.\main.ps1 -SkipCIS @('1.2', '7.10')
+.\main.ps1 -SkipCIS '1.2','7.10'
 ```
 
 - Creates `Backups\{timestamp}\` with IIS config snapshot and SCHANNEL `.reg` file
