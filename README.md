@@ -74,19 +74,36 @@ Open an **elevated PowerShell** on the target Windows Server and `cd` to this fo
 All controls run in read-only mode. The HTML report shows every control as `WhatIf`.
 Use this first to understand the current state before making any changes.
 
-### 2. Skip specific controls
+### 2. Skip specific controls (works for both `-WhatIf` and live runs)
+
+Skip a single control:
 
 ```powershell
+.\main.ps1 -WhatIf -SkipCIS '7.12'
+```
+
+Skip multiple controls (either format works):
+
+```powershell
+.\main.ps1 -WhatIf -SkipCIS '2.3','7.12'
 .\main.ps1 -WhatIf -SkipCIS @('2.3', '7.12')
 ```
 
 Skipped controls appear in the report as `Skipped`.
 Accepts any combination of CIS reference numbers (e.g. `'1.2'`, `'7.6'`).
+You do **not** need to provide a range — pass only the control IDs you want to skip.
+Invalid CIS references in `-SkipCIS` are ignored with a warning in the log.
 
 ### 3. Live run — applies changes and creates backups
 
 ```powershell
 .\main.ps1
+```
+
+Live run while skipping selected controls:
+
+```powershell
+.\main.ps1 -SkipCIS '1.2','7.10'
 ```
 
 - Creates `Backups\{timestamp}\` with IIS config snapshot and SCHANNEL `.reg` file
