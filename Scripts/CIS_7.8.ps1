@@ -20,7 +20,22 @@ function Invoke-CIS7_8 {
     $beforeState = "Enabled=$( if ($null -eq $beforeEn) { 'not set' } else { $beforeEn } )"
     $messages.Add("Before: DES 56/56 $beforeState")
 
+    $isCompliant = ($beforeEn -eq $wantEnabled)
+
     if ($WhatIf) {
+        if ($isCompliant) {
+            $messages.Add('Already compliant. No changes required.')
+            return [PSCustomObject]@{
+                CISRef      = $cisRef
+                Description = $desc
+                Level       = $level
+                Before      = $beforeState
+                After       = $beforeState
+                Status      = 'Pass'
+                Messages    = $messages.ToArray()
+            }
+        }
+
         $messages.Add('[WhatIf] Would set DES 56/56 Enabled=0.')
         return [PSCustomObject]@{
             CISRef      = $cisRef
