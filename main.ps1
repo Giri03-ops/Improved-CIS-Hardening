@@ -1,10 +1,10 @@
 # =============================================================================
-# CIS IIS Hardening Orchestrator — main.ps1
-# Runs CIS controls 1.2–4.7 (IIS) and 7.2–7.12 (SCHANNEL) in sequence.
+# CIS IIS Hardening Orchestrator - main.ps1
+# Runs CIS controls 1.2-4.7 (IIS) and 7.2-7.12 (SCHANNEL) in sequence.
 #
 # Usage:
 #   .\main.ps1                          # Live run (applies changes + creates backups)
-#   .\main.ps1 -WhatIf                  # Audit only — no changes, no backups
+#   .\main.ps1 -WhatIf                  # Audit only - no changes, no backups
 #   .\main.ps1 -WhatIf -SkipCIS '2.3','7.12'   # Skip specific controls
 #
 # Restore IIS after a live run:
@@ -18,7 +18,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # ---------------------------------------------------------------------------
-# 1. Admin check (manual — not #Requires, so the message reaches the log)
+# 1. Admin check (manual - not #Requires, so the message reaches the log)
 # ---------------------------------------------------------------------------
 $principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -47,7 +47,7 @@ New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
 New-Item -Path $reportDir -ItemType Directory -Force | Out-Null
 
 # ---------------------------------------------------------------------------
-# 4. Write-Log — writes to console and appends to log file
+# 4. Write-Log - writes to console and appends to log file
 # ---------------------------------------------------------------------------
 function Write-Log {
     param(
@@ -98,7 +98,7 @@ $IISInstalled = $null -ne $iisService
 if ($IISInstalled) {
     Write-Log 'IIS (W3SVC) service detected.'
 } else {
-    Write-Log 'IIS (W3SVC) not found. IIS-specific controls (1.2–4.7) will be skipped.' -Level Warning
+    Write-Log 'IIS (W3SVC) not found. IIS-specific controls (1.2-4.7) will be skipped.' -Level Warning
 }
 
 # ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ if ($IISInstalled) {
         Import-Module WebAdministration -ErrorAction Stop
         Write-Log 'WebAdministration module imported successfully.'
     } catch {
-        Write-Log "Failed to import WebAdministration module: $_ — IIS controls will be skipped." -Level Error
+        Write-Log "Failed to import WebAdministration module: $_ - IIS controls will be skipped." -Level Error
         $IISInstalled = $false
     }
 }
@@ -174,7 +174,7 @@ if (-not $WhatIf) {
 }
 
 # ---------------------------------------------------------------------------
-# 8. CIS manifest — ordered map of all controls
+# 8. CIS manifest - ordered map of all controls
 # ---------------------------------------------------------------------------
 $manifest = [ordered]@{
     '1.2'  = @{ File='CIS_1.2.ps1';  Function='Invoke-CIS1_2';  RequiresIIS=$true;  Level='L1'; Description='Ensure host headers are configured on all sites' }
@@ -351,7 +351,7 @@ function New-CISHtmlReport {
         [int]$Failed,
         [int]$Skipped
     )
-    $modeLabel = if ($WhatIf) { 'WhatIf (Audit Only — no changes made)' } else { 'Live (Changes Applied)' }
+    $modeLabel = if ($WhatIf) { 'WhatIf (Audit Only - no changes made)' } else { 'Live (Changes Applied)' }
     $rows      = ($Results | ForEach-Object { New-HtmlTableRow $_ }) -join "`n"
 
     @"
