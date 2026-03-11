@@ -32,6 +32,17 @@ function Invoke-CIS2_4 {
     foreach ($s in $sites) {
         $siteName = $s.Name
 
+        $hasFormsAuthSection = $null -ne (Get-WebConfiguration `
+            -PSPath   'MACHINE/WEBROOT/APPHOST' `
+            -Location $siteName `
+            -Filter   'system.web/authentication/forms' `
+            -ErrorAction SilentlyContinue)
+
+        if (-not $hasFormsAuthSection) {
+            $messages.Add("[$siteName] Forms Auth section not present for this site - skipping.")
+            continue
+        }
+
         $cookielessProp = Get-WebConfigurationProperty `
             -PSPath   'MACHINE/WEBROOT/APPHOST' `
             -Location $siteName `
@@ -40,7 +51,7 @@ function Invoke-CIS2_4 {
             -ErrorAction SilentlyContinue
 
         if ($null -eq $cookielessProp) {
-            $messages.Add("[$siteName] Forms Auth not configured - skipping.")
+            $messages.Add("[$siteName] Could not read forms/cookieless property - skipping.")
             continue
         }
 
