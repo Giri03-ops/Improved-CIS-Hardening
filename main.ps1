@@ -100,24 +100,38 @@ if ($IISInstalled) {
 if (-not $WhatIf) {
     Write-Log 'Starting backup phase...'
 
+    $backupErrors = @()
     $appcmd = "$env:SystemRoot\System32\inetsrv\appcmd.exe"
 
     if ($IISInstalled -and (Test-Path $appcmd)) {
         # IIS named backup (restores with: appcmd restore backup "CIS_<ts>")
         $iisBackupName = "CIS_$ts"
+        $iisNamedBackupPath = Join-Path "$env:SystemRoot\System32\inetsrv\backup" $iisBackupName
         try {
             & $appcmd add backup $iisBackupName 2>&1 | ForEach-Object { Write-Log "  [appcmd] $_" }
-            Write-Log "IIS named backup created: $iisBackupName  (restore with: appcmd restore backup `"$iisBackupName`")"
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $iisNamedBackupPath)) {
+                Write-Log "IIS named backup created: $iisBackupName  (restore with: appcmd restore backup `"$iisBackupName`")"
+            } else {
+                $backupErrors += "IIS named backup was not created at '$iisNamedBackupPath'."
+                Write-Log "IIS named backup command completed but no named backup was found at '$iisNamedBackupPath'." -Level Error
+            }
         } catch {
-            Write-Log "IIS named backup failed: $_ — continuing." -Level Warning
+            $backupErrors += "IIS named backup command failed: $_"
+            Write-Log "IIS named backup failed: $_" -Level Error
         }
 
         # Human-readable config snapshot
         try {
             & $appcmd list config 'MACHINE/WEBROOT/APPHOST' 2>&1 | Out-File -FilePath $IISXmlExport -Encoding UTF8
-            Write-Log "IIS config snapshot: $IISXmlExport"
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $IISXmlExport)) {
+                Write-Log "IIS config snapshot: $IISXmlExport"
+            } else {
+                $backupErrors += "IIS config snapshot was not created at '$IISXmlExport'."
+                Write-Log "IIS config export command completed but snapshot file was not created: $IISXmlExport" -Level Error
+            }
         } catch {
-            Write-Log "IIS config export failed: $_ — continuing." -Level Warning
+            $backupErrors += "IIS config export failed: $_"
+            Write-Log "IIS config export failed: $_" -Level Error
         }
     }
 
@@ -125,9 +139,21 @@ if (-not $WhatIf) {
     try {
         & reg @('export', 'HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL', $SCHANNELReg, '/y') 2>&1 |
             ForEach-Object { Write-Log "  [reg] $_" }
-        Write-Log "SCHANNEL registry backup: $SCHANNELReg"
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $SCHANNELReg)) {
+            Write-Log "SCHANNEL registry backup: $SCHANNELReg"
+        } else {
+            $backupErrors += "SCHANNEL registry backup was not created at '$SCHANNELReg'."
+            Write-Log "SCHANNEL registry export command completed but backup file was not created: $SCHANNELReg" -Level Error
+        }
     } catch {
-        Write-Log "SCHANNEL registry backup failed: $_ — continuing." -Level Warning
+        $backupErrors += "SCHANNEL registry export failed: $_"
+        Write-Log "SCHANNEL registry backup failed: $_" -Level Error
+    }
+
+    if ($backupErrors.Count -gt 0) {
+        Write-Log 'Backup phase failed verification. Aborting before CIS controls are applied.' -Level Error
+        foreach ($err in $backupErrors) { Write-Log "  - $err" -Level Error }
+        throw 'Backup phase validation failed.'
     }
 
     Write-Log 'Backup phase complete.'
