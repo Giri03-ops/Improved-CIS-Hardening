@@ -1,9 +1,25 @@
 # CIS 3.7 (L1) Ensure cookies are set with HttpOnly flag (httpOnlyCookies=True)
-# Refactored: wrapped in function, structured return, no Write-Host
+# Fixed: robust boolean extraction handles string/ConfigurationAttribute/bool
 
 function Invoke-CIS3_7 {
     [CmdletBinding()]
     param([switch]$WhatIf)
+
+    function Resolve-BoolValue {
+        param($Value)
+        if ($null -eq $Value) { return $false }
+        # Try .Value property first (ConfigurationAttribute objects)
+        $raw = $Value
+        if ($Value.PSObject.Properties.Match('Value').Count -gt 0) {
+            $raw = $Value.Value
+        }
+        if ($null -eq $raw) { return $false }
+        try {
+            return [System.Convert]::ToBoolean($raw)
+        } catch {
+            return $false
+        }
+    }
 
     $messages = [System.Collections.Generic.List[string]]::new()
     $cisRef   = '3.7'
@@ -15,10 +31,10 @@ function Invoke-CIS3_7 {
         -filter 'system.web/httpCookies' `
         -name   'httpOnlyCookies' `
         -ErrorAction Stop
-    $beforeVal = $before.Value
+    $beforeVal = Resolve-BoolValue -Value $before
     $messages.Add("Before: httpOnlyCookies=$beforeVal")
 
-    if ($beforeVal -eq $true) {
+    if ($beforeVal) {
         $messages.Add('Already compliant.')
         return [PSCustomObject]@{
             CISRef      = $cisRef
@@ -64,14 +80,15 @@ function Invoke-CIS3_7 {
         }
     }
 
-    $afterVal = (Get-WebConfigurationProperty `
+    $after    = Get-WebConfigurationProperty `
         -pspath 'MACHINE/WEBROOT/APPHOST' `
         -filter 'system.web/httpCookies' `
         -name   'httpOnlyCookies' `
-        -ErrorAction Stop).Value
+        -ErrorAction Stop
+    $afterVal = Resolve-BoolValue -Value $after
     $messages.Add("After: httpOnlyCookies=$afterVal")
 
-    $status = if ($afterVal -eq $true) { 'Pass' } else { 'Fail' }
+    $status = if ($afterVal) { 'Pass' } else { 'Fail' }
     return [PSCustomObject]@{
         CISRef      = $cisRef
         Description = $desc

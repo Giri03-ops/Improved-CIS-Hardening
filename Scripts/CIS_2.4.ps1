@@ -1,5 +1,5 @@
 # CIS 2.4 (L2) Ensure Forms Authentication uses cookies (cookieless=UseCookies)
-# Refactored: robust enum normalization + explicit post-check handling
+# Fixed: PSPath format, value extraction, and WhatIf compliance detection
 
 function Invoke-CIS2_4 {
     [CmdletBinding()]
@@ -9,7 +9,15 @@ function Invoke-CIS2_4 {
         param($Value)
 
         if ($null -eq $Value) { return 'UseDeviceProfile' }
-        $raw = [string]$Value
+
+        # Try .Value first (ConfigurationAttribute), then fall back to raw object
+        $raw = $null
+        if ($Value.PSObject.Properties.Match('Value').Count -gt 0) {
+            $raw = [string]$Value.Value
+        }
+        if ([string]::IsNullOrWhiteSpace($raw)) {
+            $raw = [string]$Value
+        }
         if ([string]::IsNullOrWhiteSpace($raw)) { return 'UseDeviceProfile' }
 
         switch -Regex ($raw.Trim()) {
@@ -40,18 +48,18 @@ function Invoke-CIS2_4 {
         }
     }
 
-    $beforeParts   = [System.Collections.Generic.List[string]]::new()
-    $afterParts    = [System.Collections.Generic.List[string]]::new()
-    $anyFail       = $false
-    $anyApplicable = $false
+    $beforeParts    = [System.Collections.Generic.List[string]]::new()
+    $afterParts     = [System.Collections.Generic.List[string]]::new()
+    $anyFail        = $false
+    $anyApplicable  = $false
+    $anyNonCompliant = $false
 
     foreach ($s in $sites) {
         $siteName = $s.Name
 
         $formsSection = Get-WebConfiguration `
-            -PSPath   'MACHINE/WEBROOT/APPHOST' `
-            -Location $siteName `
-            -Filter   'system.web/authentication/forms' `
+            -PSPath "MACHINE/WEBROOT/APPHOST/$siteName" `
+            -Filter 'system.web/authentication/forms' `
             -ErrorAction SilentlyContinue
 
         if ($null -eq $formsSection) {
@@ -62,13 +70,12 @@ function Invoke-CIS2_4 {
         $anyApplicable = $true
 
         $cookielessProp = Get-WebConfigurationProperty `
-            -PSPath   'MACHINE/WEBROOT/APPHOST' `
-            -Location $siteName `
-            -Filter   'system.web/authentication/forms' `
-            -Name     'cookieless' `
+            -PSPath "MACHINE/WEBROOT/APPHOST/$siteName" `
+            -Filter 'system.web/authentication/forms' `
+            -Name   'cookieless' `
             -ErrorAction SilentlyContinue
 
-        $currentCookieless = Resolve-CookielessValue -Value $cookielessProp.Value
+        $currentCookieless = Resolve-CookielessValue -Value $cookielessProp
         $beforeParts.Add("$siteName=cookieless:$currentCookieless")
         $messages.Add("[$siteName] cookieless=$currentCookieless")
 
@@ -78,6 +85,8 @@ function Invoke-CIS2_4 {
             continue
         }
 
+        $anyNonCompliant = $true
+
         if ($WhatIf) {
             $messages.Add("[WhatIf] [$siteName] Would set cookieless=UseCookies.")
             $afterParts.Add("$siteName=N/A(WhatIf)")
@@ -86,11 +95,10 @@ function Invoke-CIS2_4 {
 
         try {
             Set-WebConfigurationProperty `
-                -PSPath   'MACHINE/WEBROOT/APPHOST' `
-                -Location $siteName `
-                -Filter   'system.web/authentication/forms' `
-                -Name     'cookieless' `
-                -Value    'UseCookies' `
+                -PSPath "MACHINE/WEBROOT/APPHOST/$siteName" `
+                -Filter 'system.web/authentication/forms' `
+                -Name   'cookieless' `
+                -Value  'UseCookies' `
                 -ErrorAction Stop
         } catch {
             $messages.Add("[$siteName] Failed to set cookieless=UseCookies. Error: $($_.Exception.Message)")
@@ -100,13 +108,12 @@ function Invoke-CIS2_4 {
         }
 
         $postProp = Get-WebConfigurationProperty `
-            -PSPath   'MACHINE/WEBROOT/APPHOST' `
-            -Location $siteName `
-            -Filter   'system.web/authentication/forms' `
-            -Name     'cookieless' `
+            -PSPath "MACHINE/WEBROOT/APPHOST/$siteName" `
+            -Filter 'system.web/authentication/forms' `
+            -Name   'cookieless' `
             -ErrorAction SilentlyContinue
 
-        $postCookieless = Resolve-CookielessValue -Value $postProp.Value
+        $postCookieless = Resolve-CookielessValue -Value $postProp
         $messages.Add("[$siteName] Post-check: cookieless=$postCookieless")
 
         if ($postCookieless -ne 'UseCookies') { $anyFail = $true }
@@ -125,13 +132,18 @@ function Invoke-CIS2_4 {
         }
     }
 
-    $status = if ($WhatIf) { 'WhatIf' } elseif ($anyFail) { 'Fail' } else { 'Pass' }
+    if ($WhatIf) {
+        $status = if ($anyNonCompliant) { 'WhatIf' } else { 'Pass' }
+    } else {
+        $status = if ($anyFail) { 'Fail' } else { 'Pass' }
+    }
+
     return [PSCustomObject]@{
         CISRef      = $cisRef
         Description = $desc
         Level       = $level
         Before      = $beforeParts -join '; '
-        After       = if ($WhatIf) { 'N/A (WhatIf)' } else { $afterParts -join '; ' }
+        After       = if ($WhatIf -and $anyNonCompliant) { 'N/A (WhatIf)' } elseif ($WhatIf) { $beforeParts -join '; ' } else { $afterParts -join '; ' }
         Status      = $status
         Messages    = $messages.ToArray()
     }

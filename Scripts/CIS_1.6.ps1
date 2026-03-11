@@ -1,5 +1,5 @@
 # CIS 1.6 (L1) Ensure 'application pool identity' is configured for anonymous user identity
-# Refactored: enforce anonymousAuthentication.userName='' (app pool identity)
+# Fixed: check passAnonymousToken on app pools (not anonymousAuthentication.userName)
 
 function Invoke-CIS1_6 {
     [CmdletBinding()]
@@ -10,57 +10,43 @@ function Invoke-CIS1_6 {
     $desc     = "Ensure 'application pool identity' is configured for anonymous user identity"
     $level    = 'L1'
 
-    $anonEntries = Get-WebConfiguration `
-        -Filter 'system.webServer/security/authentication/anonymousAuthentication' `
-        -Recurse -ErrorAction SilentlyContinue |
-        Where-Object { $_.enabled -eq $true }
-
-    if (-not $anonEntries) {
-        $messages.Add('No locations with Anonymous Authentication enabled.')
+    $pools = Get-ChildItem IIS:\AppPools -ErrorAction SilentlyContinue
+    if (-not $pools) {
+        $messages.Add('No application pools found.')
         return [PSCustomObject]@{
             CISRef      = $cisRef
             Description = $desc
             Level       = $level
-            Before      = 'Anonymous Authentication: not enabled anywhere'
+            Before      = 'No app pools'
             After       = 'N/A'
             Status      = 'Skipped'
             Messages    = $messages.ToArray()
         }
     }
 
-    $anonLocations = @(
-        $anonEntries |
-            Select-Object -ExpandProperty Location |
-            ForEach-Object { if ($null -eq $_) { '' } else { $_.ToString().Trim() } } |
-            Sort-Object -Unique
-    )
-
-    $displayLocations = @($anonLocations | ForEach-Object { if ([string]::IsNullOrWhiteSpace($_)) { '<server-root>' } else { $_ } })
-    $messages.Add("Anonymous Authentication enabled at: $($displayLocations -join ', ')")
-
-    $beforeParts = [System.Collections.Generic.List[string]]::new()
-    $afterParts  = [System.Collections.Generic.List[string]]::new()
-
+    $beforeParts  = [System.Collections.Generic.List[string]]::new()
+    $afterParts   = [System.Collections.Generic.List[string]]::new()
     $nonCompliant = [System.Collections.Generic.List[string]]::new()
-    foreach ($location in $anonLocations) {
-        $userName = [string](Get-WebConfigurationProperty `
-            -PSPath   'MACHINE/WEBROOT/APPHOST' `
-            -Location $location `
-            -Filter   'system.webServer/security/authentication/anonymousAuthentication' `
-            -Name     'userName' `
-            -ErrorAction SilentlyContinue).Value
 
-        $locLabel = if ([string]::IsNullOrWhiteSpace($location)) { '<server-root>' } else { $location }
-        $safeUser = if ($null -eq $userName) { '' } else { $userName }
-        $beforeParts.Add("$locLabel=userName:'$safeUser'")
-
-        if (-not [string]::IsNullOrWhiteSpace($safeUser)) {
-            $nonCompliant.Add($location)
+    foreach ($pool in $pools) {
+        $poolName = $pool.Name
+        $raw = Get-ItemProperty -Path "IIS:\AppPools\$poolName" -Name passAnonymousToken -ErrorAction SilentlyContinue
+        try {
+            $val = [System.Convert]::ToBoolean($raw)
+        } catch {
+            $val = $false
+        }
+        $beforeParts.Add("$poolName=passAnonymousToken:$val")
+        if (-not $val) {
+            $nonCompliant.Add($poolName)
         }
     }
 
+    $messages.Add("App pools checked: $($pools.Count)")
+
+    # If all pools are already compliant, return Pass (before WhatIf check)
     if ($nonCompliant.Count -eq 0) {
-        $messages.Add('All anonymous authentication entries already use application pool identity (userName blank).')
+        $messages.Add('All application pools already have passAnonymousToken=True.')
         return [PSCustomObject]@{
             CISRef      = $cisRef
             Description = $desc
@@ -73,8 +59,7 @@ function Invoke-CIS1_6 {
     }
 
     if ($WhatIf) {
-        $whatIfTargets = @($nonCompliant | ForEach-Object { if ([string]::IsNullOrWhiteSpace($_)) { '<server-root>' } else { $_ } })
-        $messages.Add("[WhatIf] Would set anonymousAuthentication userName='' for: $($whatIfTargets -join ', ')")
+        $messages.Add("[WhatIf] Would set passAnonymousToken=True for: $($nonCompliant -join ', ')")
         return [PSCustomObject]@{
             CISRef      = $cisRef
             Description = $desc
@@ -86,47 +71,30 @@ function Invoke-CIS1_6 {
         }
     }
 
+    # Remediate non-compliant pools
     $setFailures = [System.Collections.Generic.List[string]]::new()
-    foreach ($location in $nonCompliant) {
-        $locLabel = if ([string]::IsNullOrWhiteSpace($location)) { '<server-root>' } else { $location }
+    foreach ($poolName in $nonCompliant) {
         try {
-            Set-WebConfigurationProperty `
-                -PSPath   'MACHINE/WEBROOT/APPHOST' `
-                -Location $location `
-                -Filter   'system.webServer/security/authentication/anonymousAuthentication' `
-                -Name     'userName' `
-                -Value    '' `
-                -ErrorAction Stop
-
-            Set-WebConfigurationProperty `
-                -PSPath   'MACHINE/WEBROOT/APPHOST' `
-                -Location $location `
-                -Filter   'system.webServer/security/authentication/anonymousAuthentication' `
-                -Name     'password' `
-                -Value    '' `
-                -ErrorAction SilentlyContinue
-
-            $messages.Add("Set anonymousAuthentication userName='' for: $locLabel")
+            Set-ItemProperty -Path "IIS:\AppPools\$poolName" -Name passAnonymousToken -Value $true -ErrorAction Stop
+            $messages.Add("Set passAnonymousToken=True for: $poolName")
         } catch {
-            $setFailures.Add($location)
-            $messages.Add("Failed setting anonymousAuthentication identity for '$locLabel'. Error: $($_.Exception.Message)")
+            $setFailures.Add($poolName)
+            $messages.Add("Failed setting passAnonymousToken for '$poolName'. Error: $($_.Exception.Message)")
         }
     }
 
+    # Post-check: re-read all pools
     $allGood = $true
-    foreach ($location in $anonLocations) {
-        $locLabel = if ([string]::IsNullOrWhiteSpace($location)) { '<server-root>' } else { $location }
-        $postUser = [string](Get-WebConfigurationProperty `
-            -PSPath   'MACHINE/WEBROOT/APPHOST' `
-            -Location $location `
-            -Filter   'system.webServer/security/authentication/anonymousAuthentication' `
-            -Name     'userName' `
-            -ErrorAction SilentlyContinue).Value
-
-        $safePostUser = if ($null -eq $postUser) { '' } else { $postUser }
-        $afterParts.Add("$locLabel=userName:'$safePostUser'")
-
-        if (-not [string]::IsNullOrWhiteSpace($safePostUser)) {
+    foreach ($pool in $pools) {
+        $poolName = $pool.Name
+        $raw = Get-ItemProperty -Path "IIS:\AppPools\$poolName" -Name passAnonymousToken -ErrorAction SilentlyContinue
+        try {
+            $val = [System.Convert]::ToBoolean($raw)
+        } catch {
+            $val = $false
+        }
+        $afterParts.Add("$poolName=passAnonymousToken:$val")
+        if (-not $val) {
             $allGood = $false
         }
     }
