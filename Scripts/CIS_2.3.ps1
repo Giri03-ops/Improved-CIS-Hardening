@@ -27,8 +27,9 @@ function Invoke-CIS2_3 {
 
     $beforeParts   = [System.Collections.Generic.List[string]]::new()
     $afterParts    = [System.Collections.Generic.List[string]]::new()
-    $anyFail       = $false
-    $anyApplicable = $false
+    $anyFail         = $false
+    $anyApplicable   = $false
+    $anyActionable   = $false
 
     foreach ($s in $sites) {
         $siteName = $s.Name
@@ -57,6 +58,8 @@ function Invoke-CIS2_3 {
             $afterParts.Add("$siteName=Skipped(noHTTPS)")
             continue
         }
+
+        $anyActionable = $true
 
         if ($requireSsl) {
             $messages.Add("[$siteName] Already compliant.")
@@ -104,6 +107,18 @@ function Invoke-CIS2_3 {
             Level       = $level
             Before      = 'Forms Auth not configured on any site'
             After       = 'N/A'
+            Status      = 'Skipped'
+            Messages    = $messages.ToArray()
+        }
+    }
+
+    if (-not $anyActionable) {
+        return [PSCustomObject]@{
+            CISRef      = $cisRef
+            Description = $desc
+            Level       = $level
+            Before      = $beforeParts -join '; '
+            After       = $afterParts -join '; '
             Status      = 'Skipped'
             Messages    = $messages.ToArray()
         }

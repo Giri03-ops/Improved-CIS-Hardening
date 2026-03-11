@@ -45,7 +45,12 @@ function Invoke-CIS2_4 {
         }
 
         $anyApplicable = $true
-        $cookieless    = [string]$cookielessProp.Value
+        $cookielessRaw = $cookielessProp.Value
+        $cookieless    = if ($null -eq $cookielessRaw) { '' } else { [string]$cookielessRaw }
+        if ([string]::IsNullOrWhiteSpace($cookieless)) {
+            $cookieless = 'UseDeviceProfile'
+            $messages.Add("[$siteName] cookieless is inherited/default; treating as UseDeviceProfile.")
+        }
         $beforeParts.Add("$siteName=cookieless:$cookieless")
         $messages.Add("[$siteName] cookieless=$cookieless")
 
