@@ -33,7 +33,33 @@ function Invoke-CIS7_2 {
     $beforeState = $beforeParts -join '; '
     $messages.Add("Before: $beforeState")
 
+    $isCompliant = $true
+    foreach ($t in $targets) {
+        $en = $null; $dbd = $null
+        if (Test-Path $t.Path) {
+            try { $en  = (Get-ItemProperty -Path $t.Path -Name Enabled           -ErrorAction Stop).Enabled           } catch {}
+            try { $dbd = (Get-ItemProperty -Path $t.Path -Name DisabledByDefault -ErrorAction Stop).DisabledByDefault } catch {}
+        }
+        if ($en -ne $wantEnabled -or $dbd -ne $wantDbd) {
+            $isCompliant = $false
+            break
+        }
+    }
+
     if ($WhatIf) {
+        if ($isCompliant) {
+            $messages.Add('Already compliant. No changes required.')
+            return [PSCustomObject]@{
+                CISRef      = $cisRef
+                Description = $desc
+                Level       = $level
+                Before      = $beforeState
+                After       = $beforeState
+                Status      = 'Pass'
+                Messages    = $messages.ToArray()
+            }
+        }
+
         $messages.Add("[WhatIf] Would set $proto Server+Client: Enabled=$wantEnabled, DisabledByDefault=$wantDbd.")
         return [PSCustomObject]@{
             CISRef      = $cisRef

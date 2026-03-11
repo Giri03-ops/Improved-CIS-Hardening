@@ -25,7 +25,33 @@ function Invoke-CIS7_9 {
     $beforeState = $beforeParts -join '; '
     $messages.Add("Before: $beforeState")
 
+    $isCompliant = $true
+    foreach ($name in $rc4Names) {
+        $p  = Join-Path $base $name
+        $en = $null
+        if (Test-Path $p) {
+            try { $en = (Get-ItemProperty -Path $p -Name Enabled -ErrorAction Stop).Enabled } catch {}
+        }
+        if ($en -ne 0) {
+            $isCompliant = $false
+            break
+        }
+    }
+
     if ($WhatIf) {
+        if ($isCompliant) {
+            $messages.Add('Already compliant. No changes required.')
+            return [PSCustomObject]@{
+                CISRef      = $cisRef
+                Description = $desc
+                Level       = $level
+                Before      = $beforeState
+                After       = $beforeState
+                Status      = 'Pass'
+                Messages    = $messages.ToArray()
+            }
+        }
+
         $messages.Add('[WhatIf] Would set all RC4 cipher variants Enabled=0.')
         return [PSCustomObject]@{
             CISRef      = $cisRef

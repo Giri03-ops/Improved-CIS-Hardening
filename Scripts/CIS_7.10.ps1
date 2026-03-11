@@ -20,7 +20,22 @@ function Invoke-CIS7_10 {
     $beforeState = "Enabled=$( if ($null -eq $beforeEn) { 'not set' } else { $beforeEn } )"
     $messages.Add("Before: AES 128/128 $beforeState")
 
+    $isCompliant = ($beforeEn -eq $wantEnabled)
+
     if ($WhatIf) {
+        if ($isCompliant) {
+            $messages.Add('Already compliant. No changes required.')
+            return [PSCustomObject]@{
+                CISRef      = $cisRef
+                Description = $desc
+                Level       = $level
+                Before      = $beforeState
+                After       = $beforeState
+                Status      = 'Pass'
+                Messages    = $messages.ToArray()
+            }
+        }
+
         $messages.Add('[WhatIf] Would set AES 128/128 Enabled=0.')
         return [PSCustomObject]@{
             CISRef      = $cisRef
