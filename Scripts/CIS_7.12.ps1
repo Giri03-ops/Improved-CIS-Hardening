@@ -33,7 +33,7 @@ function Invoke-CIS7_12 {
     if (Test-Path $path) {
         try {
             $v = (Get-ItemProperty -Path $path -Name $name -ErrorAction Stop).$name
-            $current = if ($v -is [string]) { @($v) } else { @($v) }
+            $current = if ($v -is [string[]]) { $v } else { ($v -split ',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' } }
         } catch {}
     }
 
@@ -71,7 +71,8 @@ function Invoke-CIS7_12 {
     }
 
     if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
-    New-ItemProperty -Path $path -Name $name -Value $desired -PropertyType MultiString -Force | Out-Null
+    $desiredString = $desired -join ','
+    New-ItemProperty -Path $path -Name $name -Value $desiredString -PropertyType String -Force | Out-Null
     $messages.Add("Applied: cipher suite order written ($($desired.Count) suites).")
 
     # Verify (inlined)
@@ -79,7 +80,7 @@ function Invoke-CIS7_12 {
     if (Test-Path $path) {
         try {
             $v = (Get-ItemProperty -Path $path -Name $name -ErrorAction Stop).$name
-            $after = if ($v -is [string]) { @($v) } else { @($v) }
+            $after = if ($v -is [string[]]) { $v } else { ($v -split ',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' } }
         } catch {}
     }
     $afterState = if ($null -eq $after) { 'Not set (verify error)' } else { $after -join '; ' }
