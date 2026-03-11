@@ -128,13 +128,26 @@ function Invoke-CIS1_2 {
         }
     }
 
-    Set-WebConfigurationProperty `
-        -pspath 'MACHINE/WEBROOT/APPHOST' `
-        -filter $filter `
-        -name  'bindingInformation' `
-        -value "*:80:$HostHeader"
-
-    $messages.Add("Updated host header for site '$SiteName' to '$HostHeader' on HTTP :80.")
+    try {
+        Set-WebConfigurationProperty `
+            -pspath 'MACHINE/WEBROOT/APPHOST' `
+            -filter $filter `
+            -name  'bindingInformation' `
+            -value "*:80:$HostHeader" `
+            -ErrorAction Stop
+        $messages.Add("Updated host header for site '$SiteName' to '$HostHeader' on HTTP :80.")
+    } catch {
+        $messages.Add("Failed to update host header for site '$SiteName'. Error: $($_.Exception.Message)")
+        return [PSCustomObject]@{
+            CISRef      = $cisRef
+            Description = $desc
+            Level       = $level
+            Before      = $beforeState
+            After       = 'bindingInformation=SetFailed'
+            Status      = 'Fail'
+            Messages    = $messages.ToArray()
+        }
+    }
 
     $afterBindings = Get-WebBinding -ErrorAction SilentlyContinue
     $afterState    = if ($afterBindings) {

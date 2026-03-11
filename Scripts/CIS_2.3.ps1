@@ -35,9 +35,10 @@ function Invoke-CIS2_3 {
         $hasHttps = @(Get-WebBinding -Name $siteName -Protocol https -ErrorAction SilentlyContinue).Count -gt 0
 
         $requireSslProp = Get-WebConfigurationProperty `
-            -pspath "MACHINE/WEBROOT/APPHOST/$siteName" `
-            -filter 'system.web/authentication/forms' `
-            -name   'requireSSL' `
+            -PSPath   'MACHINE/WEBROOT/APPHOST' `
+            -Location $siteName `
+            -Filter   'system.web/authentication/forms' `
+            -Name     'requireSSL' `
             -ErrorAction SilentlyContinue
 
         if ($null -eq $requireSslProp) {
@@ -69,17 +70,27 @@ function Invoke-CIS2_3 {
             continue
         }
 
-        Set-WebConfigurationProperty `
-            -pspath "MACHINE/WEBROOT/APPHOST/$siteName" `
-            -filter 'system.web/authentication/forms' `
-            -name   'requireSSL' `
-            -value  $true
+        try {
+            Set-WebConfigurationProperty `
+                -PSPath   'MACHINE/WEBROOT/APPHOST' `
+                -Location $siteName `
+                -Filter   'system.web/authentication/forms' `
+                -Name     'requireSSL' `
+                -Value    $true `
+                -ErrorAction Stop
+        } catch {
+            $messages.Add("[$siteName] Failed to set requireSSL=True. Error: $($_.Exception.Message)")
+            $anyFail = $true
+            $afterParts.Add("$siteName=SetFailed")
+            continue
+        }
 
         # Post-check
         $postVal = [bool](Get-WebConfigurationProperty `
-            -pspath "MACHINE/WEBROOT/APPHOST/$siteName" `
-            -filter 'system.web/authentication/forms' `
-            -name   'requireSSL' `
+            -PSPath   'MACHINE/WEBROOT/APPHOST' `
+            -Location $siteName `
+            -Filter   'system.web/authentication/forms' `
+            -Name     'requireSSL' `
             -ErrorAction SilentlyContinue).Value
         $messages.Add("[$siteName] Post-check: requireSSL=$postVal")
         if (-not $postVal) { $anyFail = $true }
