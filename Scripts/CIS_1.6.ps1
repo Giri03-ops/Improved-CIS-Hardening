@@ -28,12 +28,19 @@ function Invoke-CIS1_6 {
         }
     }
 
-    $anonLocations = @($anonEntries | Select-Object -ExpandProperty Location | Sort-Object -Unique)
+    $anonLocations = @(
+        $anonEntries |
+            Select-Object -ExpandProperty Location |
+            ForEach-Object { if ($null -eq $_) { '' } else { $_.ToString().Trim() } } |
+            Sort-Object -Unique
+    )
     $beforeState   = 'Anonymous Auth enabled at: ' + ($anonLocations -join '; ')
-    $messages.Add("Anonymous Authentication enabled at: $($anonLocations -join ', ')")
+    $displayLocations = @($anonLocations | ForEach-Object { if ([string]::IsNullOrWhiteSpace($_)) { '<server-root>' } else { $_ } })
+    $messages.Add("Anonymous Authentication enabled at: $($displayLocations -join ', ')")
 
     # Resolve app pools for those sites
     $appPools = foreach ($loc in $anonLocations) {
+        if ([string]::IsNullOrWhiteSpace($loc)) { continue }
         $siteName = ($loc -split '/')[0]
         Get-WebConfiguration `
             -Filter "system.applicationHost/sites/site[@name='$siteName']/application" `
@@ -75,13 +82,17 @@ function Invoke-CIS1_6 {
         $messages.Add("Set passAnonymousToken=True for: $pool")
     }
 
-    # Post-check
+    # Post-check (coerce to bool to avoid provider-specific string/integer values)
     $allGood    = $true
     $afterParts = [System.Collections.Generic.List[string]]::new()
     foreach ($pool in $appPools) {
-        $val = (Get-ItemProperty -Path "IIS:\AppPools\$pool" -Name passAnonymousToken -ErrorAction SilentlyContinue).passAnonymousToken
-        $afterParts.Add("$pool=passAnonymousToken:$val")
-        if ($val -ne $true) { $allGood = $false }
+        $rawVal = (Get-ItemProperty -Path "IIS:\AppPools\$pool" -Name passAnonymousToken -ErrorAction SilentlyContinue).passAnonymousToken
+        $isEnabled = $false
+        if ($null -ne $rawVal) {
+            try { $isEnabled = [System.Convert]::ToBoolean($rawVal) } catch { $isEnabled = $false }
+        }
+        $afterParts.Add("$pool=passAnonymousToken:$rawVal (bool:$isEnabled)")
+        if (-not $isEnabled) { $allGood = $false }
     }
 
     $status = if ($allGood) { 'Pass' } else { 'Fail' }
