@@ -34,13 +34,21 @@ function Invoke-CIS1_6 {
             ForEach-Object { if ($null -eq $_) { '' } else { $_.ToString().Trim() } } |
             Sort-Object -Unique
     )
-    $beforeState   = 'Anonymous Auth enabled at: ' + ($anonLocations -join '; ')
     $displayLocations = @($anonLocations | ForEach-Object { if ([string]::IsNullOrWhiteSpace($_)) { '<server-root>' } else { $_ } })
+    $beforeState   = 'Anonymous Auth enabled at: ' + ($displayLocations -join '; ')
     $messages.Add("Anonymous Authentication enabled at: $($displayLocations -join ', ')")
 
     # Resolve app pools for those sites
     $appPools = foreach ($loc in $anonLocations) {
-        if ([string]::IsNullOrWhiteSpace($loc)) { continue }
+        if ([string]::IsNullOrWhiteSpace($loc)) {
+            # Server-level setting applies broadly; include all site application pools.
+            Get-WebConfiguration `
+                -Filter 'system.applicationHost/sites/site/application' `
+                -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty applicationPool
+            continue
+        }
+
         $siteName = ($loc -split '/')[0]
         Get-WebConfiguration `
             -Filter "system.applicationHost/sites/site[@name='$siteName']/application" `
