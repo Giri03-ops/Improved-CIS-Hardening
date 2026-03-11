@@ -185,7 +185,7 @@ foreach ($ref in $manifest.Keys) {
 
     # Skip if user requested
     if ($effectiveSkipCIS -contains $ref) {
-        Write-Log "CIS $ref: Skipped (user-requested via -SkipCIS)." -Level Warning
+        Write-Log "CIS ${ref}: Skipped (user-requested via -SkipCIS)." -Level Warning
         $Results.Add([PSCustomObject]@{
             CISRef      = $ref
             Description = $entry.Description
@@ -200,7 +200,7 @@ foreach ($ref in $manifest.Keys) {
 
     # Skip IIS controls when IIS is not installed
     if ($entry.RequiresIIS -and -not $IISInstalled) {
-        Write-Log "CIS $ref: Skipped (IIS not installed)." -Level Warning
+        Write-Log "CIS ${ref}: Skipped (IIS not installed)." -Level Warning
         $Results.Add([PSCustomObject]@{
             CISRef      = $ref
             Description = $entry.Description
@@ -217,7 +217,7 @@ foreach ($ref in $manifest.Keys) {
 
     # Fail fast if script file is missing
     if (-not (Test-Path $scriptPath)) {
-        Write-Log "CIS $ref: Script file not found: $scriptPath" -Level Error
+        Write-Log "CIS ${ref}: Script file not found: $scriptPath" -Level Error
         $Results.Add([PSCustomObject]@{
             CISRef      = $ref
             Description = $entry.Description
