@@ -18,7 +18,7 @@ function Invoke-CIS7_2 {
     $wantEnabled = 0
     $wantDbd     = 1
 
-    # Read before state (inlined — no shared helper)
+    # Read before state (inlined - no shared helper)
     $beforeParts = [System.Collections.Generic.List[string]]::new()
     foreach ($t in $targets) {
         $en = $null; $dbd = $null
