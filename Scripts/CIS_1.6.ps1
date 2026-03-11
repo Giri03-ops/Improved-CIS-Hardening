@@ -34,15 +34,26 @@ function Invoke-CIS1_6 {
             ForEach-Object { if ($null -eq $_) { '' } else { $_.ToString().Trim() } } |
             Sort-Object -Unique
     )
-    $beforeState   = 'Anonymous Auth enabled at: ' + ($anonLocations -join '; ')
     $displayLocations = @($anonLocations | ForEach-Object { if ([string]::IsNullOrWhiteSpace($_)) { '<server-root>' } else { $_ } })
     $messages.Add("Anonymous Authentication enabled at: $($displayLocations -join ', ')")
 
-    # Resolve app pools for those sites
+    # Resolve app pools for impacted locations.
     $appPools = foreach ($loc in $anonLocations) {
-        if ([string]::IsNullOrWhiteSpace($loc)) { continue }
+        if ([string]::IsNullOrWhiteSpace($loc)) {
+            # Server-level setting applies broadly; include all site applications.
+            Get-WebConfiguration `
+                -PSPath 'MACHINE/WEBROOT/APPHOST' `
+                -Filter 'system.applicationHost/sites/site/application' `
+                -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty applicationPool
+            continue
+        }
+
         $siteName = ($loc -split '/')[0]
+        if ([string]::IsNullOrWhiteSpace($siteName)) { continue }
+
         Get-WebConfiguration `
+            -PSPath 'MACHINE/WEBROOT/APPHOST' `
             -Filter "system.applicationHost/sites/site[@name='$siteName']/application" `
             -ErrorAction SilentlyContinue |
             Select-Object -ExpandProperty applicationPool
@@ -55,7 +66,7 @@ function Invoke-CIS1_6 {
             CISRef      = $cisRef
             Description = $desc
             Level       = $level
-            Before      = $beforeState
+            Before      = 'Anonymous Auth enabled at: ' + ($displayLocations -join '; ')
             After       = 'N/A'
             Status      = 'Skipped'
             Messages    = $messages.ToArray()
@@ -64,13 +75,43 @@ function Invoke-CIS1_6 {
 
     $messages.Add("Resolved app pools: $($appPools -join ', ')")
 
-    if ($WhatIf) {
-        $messages.Add("[WhatIf] Would set passAnonymousToken=True for: $($appPools -join ', ')")
+    # Build per-pool current state first (so WhatIf can correctly identify compliant pools).
+    $beforeParts  = [System.Collections.Generic.List[string]]::new()
+    $targetPools  = [System.Collections.Generic.List[string]]::new()
+    foreach ($pool in $appPools) {
+        $rawVal = (Get-ItemProperty -Path "IIS:\AppPools\$pool" -Name passAnonymousToken -ErrorAction SilentlyContinue).passAnonymousToken
+        $isEnabled = $false
+        if ($null -ne $rawVal) {
+            try { $isEnabled = [System.Convert]::ToBoolean($rawVal) } catch { $isEnabled = $false }
+        }
+
+        $beforeParts.Add("$pool=passAnonymousToken:$rawVal (bool:$isEnabled)")
+
+        if (-not $isEnabled) {
+            $targetPools.Add($pool)
+        }
+    }
+
+    if ($targetPools.Count -eq 0) {
+        $messages.Add('All resolved application pools already have passAnonymousToken=True.')
         return [PSCustomObject]@{
             CISRef      = $cisRef
             Description = $desc
             Level       = $level
-            Before      = $beforeState
+            Before      = $beforeParts -join '; '
+            After       = $beforeParts -join '; '
+            Status      = if ($WhatIf) { 'WhatIf' } else { 'Pass' }
+            Messages    = $messages.ToArray()
+        }
+    }
+
+    if ($WhatIf) {
+        $messages.Add("[WhatIf] Would set passAnonymousToken=True for: $($targetPools -join ', ')")
+        return [PSCustomObject]@{
+            CISRef      = $cisRef
+            Description = $desc
+            Level       = $level
+            Before      = $beforeParts -join '; '
             After       = 'N/A (WhatIf)'
             Status      = 'WhatIf'
             Messages    = $messages.ToArray()
@@ -78,7 +119,7 @@ function Invoke-CIS1_6 {
     }
 
     $setFailures = [System.Collections.Generic.List[string]]::new()
-    foreach ($pool in $appPools) {
+    foreach ($pool in $targetPools) {
         try {
             Set-ItemProperty -Path "IIS:\AppPools\$pool" -Name passAnonymousToken -Value $true -ErrorAction Stop
             $messages.Add("Set passAnonymousToken=True for: $pool")
@@ -88,7 +129,7 @@ function Invoke-CIS1_6 {
         }
     }
 
-    # Post-check (coerce to bool to avoid provider-specific string/integer values)
+    # Post-check
     $allGood    = $true
     $afterParts = [System.Collections.Generic.List[string]]::new()
     foreach ($pool in $appPools) {
@@ -107,7 +148,7 @@ function Invoke-CIS1_6 {
         CISRef      = $cisRef
         Description = $desc
         Level       = $level
-        Before      = $beforeState
+        Before      = $beforeParts -join '; '
         After       = $afterParts -join '; '
         Status      = $status
         Messages    = $messages.ToArray()
