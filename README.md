@@ -108,6 +108,7 @@ Live run while skipping selected controls:
 
 - Creates `Backups\{timestamp}\` with IIS config snapshot and SCHANNEL `.reg` file
 - Creates an IIS named backup via `appcmd`
+- Validates required backup artifacts and aborts before remediation if any backup fails
 - Applies all control remediations
 - Writes `Reports\{timestamp}\CIS_Report.html` and `CIS_Run.log`
 

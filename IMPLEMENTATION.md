@@ -307,7 +307,7 @@ Orchestrates all 19 controls in order. Structure:
 | 4 | Defines `Write-Log` — writes timestamped lines to console and `CIS_Run.log` simultaneously |
 | 5 | Detects IIS via `Get-Service W3SVC` |
 | 6 | Imports `WebAdministration` module if IIS present; sets `$IISInstalled=$false` on failure |
-| 7 | Backup phase (skipped in `-WhatIf`): `appcmd add backup`, `appcmd list config`, `reg export SCHANNEL` |
+| 7 | Backup phase (skipped in `-WhatIf`): creates IIS/SCHANNEL backups, validates artifacts, and aborts remediation if any backup is missing/empty or backup creation fails |
 | 8 | Defines `$manifest` — ordered hashtable mapping each CIS ref to file, function, RequiresIIS flag |
 | 9 | Orchestration loop: skip checks → dot-source script → call function → log messages → collect result. Each control wrapped in `try/catch` so one failure never stops the rest |
 | 10 | Computes Pass/Fail/Skipped counts |

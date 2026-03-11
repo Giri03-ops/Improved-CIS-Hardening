@@ -64,6 +64,26 @@ function Write-Log {
     Add-Content -Path $logFile -Value $line -Encoding UTF8
 }
 
+function Test-BackupArtifact {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+        [Parameter(Mandatory)]
+        [string]$Description
+    )
+
+    if (-not (Test-Path -Path $Path)) {
+        throw "$Description was not created at: $Path"
+    }
+
+    $item = Get-Item -Path $Path -ErrorAction Stop
+    if (-not $item.PSIsContainer -and $item.Length -le 0) {
+        throw "$Description is empty: $Path"
+    }
+
+    Write-Log "$Description validated: $Path"
+}
+
 Write-Log "CIS IIS Hardening orchestrator started. WhatIf=$WhatIf  SkipCIS=[$($SkipCIS -join ',')]"
 Write-Log "Timestamp : $ts"
 Write-Log "Reports   : $reportDir"
@@ -101,23 +121,32 @@ if (-not $WhatIf) {
     Write-Log 'Starting backup phase...'
 
     $appcmd = "$env:SystemRoot\System32\inetsrv\appcmd.exe"
+    $backupValidationErrors = [System.Collections.Generic.List[string]]::new()
 
-    if ($IISInstalled -and (Test-Path $appcmd)) {
-        # IIS named backup (restores with: appcmd restore backup "CIS_<ts>")
-        $iisBackupName = "CIS_$ts"
-        try {
-            & $appcmd add backup $iisBackupName 2>&1 | ForEach-Object { Write-Log "  [appcmd] $_" }
-            Write-Log "IIS named backup created: $iisBackupName  (restore with: appcmd restore backup `"$iisBackupName`")"
-        } catch {
-            Write-Log "IIS named backup failed: $_ — continuing." -Level Warning
-        }
+    if ($IISInstalled) {
+        if (-not (Test-Path $appcmd)) {
+            $backupValidationErrors.Add("IIS is installed but appcmd was not found at: $appcmd")
+        } else {
+            # IIS named backup (restores with: appcmd restore backup "CIS_<ts>")
+            $iisBackupName = "CIS_$ts"
+            try {
+                & $appcmd add backup $iisBackupName 2>&1 | ForEach-Object { Write-Log "  [appcmd] $_" }
+                Write-Log "IIS named backup created: $iisBackupName  (restore with: appcmd restore backup `"$iisBackupName`")"
 
-        # Human-readable config snapshot
-        try {
-            & $appcmd list config 'MACHINE/WEBROOT/APPHOST' 2>&1 | Out-File -FilePath $IISXmlExport -Encoding UTF8
-            Write-Log "IIS config snapshot: $IISXmlExport"
-        } catch {
-            Write-Log "IIS config export failed: $_ — continuing." -Level Warning
+                $iisBackupPath = Join-Path "$env:SystemRoot\System32\inetsrv\backup" $iisBackupName
+                Test-BackupArtifact -Path $iisBackupPath -Description 'IIS named backup directory'
+            } catch {
+                $backupValidationErrors.Add("IIS named backup failed: $_")
+            }
+
+            # Human-readable config snapshot
+            try {
+                & $appcmd list config 'MACHINE/WEBROOT/APPHOST' 2>&1 | Out-File -FilePath $IISXmlExport -Encoding UTF8
+                Write-Log "IIS config snapshot created: $IISXmlExport"
+                Test-BackupArtifact -Path $IISXmlExport -Description 'IIS config snapshot'
+            } catch {
+                $backupValidationErrors.Add("IIS config export failed: $_")
+            }
         }
     }
 
@@ -125,9 +154,18 @@ if (-not $WhatIf) {
     try {
         & reg @('export', 'HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL', $SCHANNELReg, '/y') 2>&1 |
             ForEach-Object { Write-Log "  [reg] $_" }
-        Write-Log "SCHANNEL registry backup: $SCHANNELReg"
+        Write-Log "SCHANNEL registry backup created: $SCHANNELReg"
+        Test-BackupArtifact -Path $SCHANNELReg -Description 'SCHANNEL registry backup'
     } catch {
-        Write-Log "SCHANNEL registry backup failed: $_ — continuing." -Level Warning
+        $backupValidationErrors.Add("SCHANNEL registry backup failed: $_")
+    }
+
+    if ($backupValidationErrors.Count -gt 0) {
+        foreach ($validationError in $backupValidationErrors) {
+            Write-Log $validationError -Level Error
+        }
+        Write-Log 'Backup phase failed validation. Aborting remediation before any CIS controls are executed.' -Level Error
+        exit 1
     }
 
     Write-Log 'Backup phase complete.'
