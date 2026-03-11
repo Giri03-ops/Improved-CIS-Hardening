@@ -28,7 +28,7 @@ function Invoke-CIS7_12 {
         'TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256'
     )
 
-    # Read current value (inlined — no Get-MultiString helper)
+    # Read current value (inlined - no Get-MultiString helper)
     $current = $null
     if (Test-Path $path) {
         try {
@@ -38,7 +38,7 @@ function Invoke-CIS7_12 {
     }
 
     $beforeState = if ($null -eq $current) { 'Not configured (OS default)' } else { $current -join '; ' }
-    $messages.Add("Before: cipher suite order — $beforeState")
+    $messages.Add("Before: cipher suite order - $beforeState")
 
     # Check compliance
     $alreadyCompliant = ($null -ne $current) -and (($current -join '|') -eq ($desired -join '|'))

@@ -39,7 +39,7 @@ function Invoke-CIS2_4 {
             -ErrorAction SilentlyContinue
 
         if ($null -eq $cookielessProp) {
-            $messages.Add("[$siteName] Forms Auth not configured — skipping.")
+            $messages.Add("[$siteName] Forms Auth not configured - skipping.")
             continue
         }
 

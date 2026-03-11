@@ -51,7 +51,7 @@ function Invoke-CIS1_2 {
 
     if ($httpSites.Count -ne 1) {
         $siteList = ($httpSites | ForEach-Object { $_.Name }) -join ', '
-        $messages.Add("Multiple HTTP/HTTPS sites found ($siteList). Auto-selection is unsafe — set SiteName manually.")
+        $messages.Add("Multiple HTTP/HTTPS sites found ($siteList). Auto-selection is unsafe - set SiteName manually.")
         return [PSCustomObject]@{
             CISRef      = $cisRef
             Description = $desc
@@ -103,7 +103,7 @@ function Invoke-CIS1_2 {
     $match  = Get-WebConfiguration -pspath 'MACHINE/WEBROOT/APPHOST' -filter $filter -ErrorAction SilentlyContinue
 
     if ($null -eq $match) {
-        $messages.Add("No bare HTTP '*:80:' binding found for '$SiteName' — host header already set or binding not present.")
+        $messages.Add("No bare HTTP '*:80:' binding found for '$SiteName' - host header already set or binding not present.")
         return [PSCustomObject]@{
             CISRef      = $cisRef
             Description = $desc

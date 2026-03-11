@@ -12,7 +12,7 @@ function Invoke-CIS7_9 {
     $base      = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Ciphers"
     $rc4Names  = @('RC4 40/128', 'RC4 56/128', 'RC4 64/128', 'RC4 128/128')
 
-    # Before (inlined — no shared helper)
+    # Before (inlined - no shared helper)
     $beforeParts = [System.Collections.Generic.List[string]]::new()
     foreach ($name in $rc4Names) {
         $p  = Join-Path $base $name

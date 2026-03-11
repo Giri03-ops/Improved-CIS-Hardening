@@ -41,7 +41,7 @@ function Invoke-CIS2_3 {
             -ErrorAction SilentlyContinue
 
         if ($null -eq $requireSslProp) {
-            $messages.Add("[$siteName] Forms Auth not configured — skipping.")
+            $messages.Add("[$siteName] Forms Auth not configured - skipping.")
             continue
         }
 
@@ -50,9 +50,9 @@ function Invoke-CIS2_3 {
         $beforeParts.Add("$siteName=requireSSL:$requireSsl")
         $messages.Add("[$siteName] requireSSL=$requireSsl ; httpsBinding=$hasHttps")
 
-        # FIXED: never force requireSSL when no HTTPS binding exists — skip instead
+        # FIXED: never force requireSSL when no HTTPS binding exists - skip instead
         if (-not $hasHttps) {
-            $messages.Add("[$siteName] No HTTPS binding on IIS — skipping to avoid breaking Forms Auth over HTTP.")
+            $messages.Add("[$siteName] No HTTPS binding on IIS - skipping to avoid breaking Forms Auth over HTTP.")
             $afterParts.Add("$siteName=Skipped(noHTTPS)")
             continue
         }
