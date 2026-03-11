@@ -182,7 +182,7 @@ reg import "C:\path\to\CIS Hardening\Backups\20260306_120000\SCHANNEL_Registry.r
 | Control | Level | Description | What it changes |
 |---------|-------|-------------|-----------------|
 | 1.2 | L1 | Ensure host headers are configured | Sets `bindingInformation` on bare `*:80:` HTTP bindings |
-| 1.6 | L1 | Ensure application pool identity for anonymous auth | Sets `passAnonymousToken=True` on app pools serving anonymous content |
+| 1.6 | L1 | Ensure application pool identity for anonymous auth | Sets anonymous auth identity to app pool (`userName=""`) where enabled |
 | 2.3 | L1 | Ensure Forms Auth requires SSL | Sets `requireSSL=True` — only on sites with an HTTPS binding |
 | 2.4 | L2 | Ensure Forms Auth uses cookies | Sets `cookieless=UseCookies` |
 | 3.7 | L1 | Ensure HttpOnly cookies | Sets `httpOnlyCookies=True` in global `system.web/httpCookies` |
