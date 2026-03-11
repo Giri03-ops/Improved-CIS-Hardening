@@ -41,7 +41,20 @@ function Invoke-CIS3_10 {
         }
     }
 
-    Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT' -filter 'system.web/trust' -name 'level' -value $targetLevel -ErrorAction Stop
+    try {
+        Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT' -filter 'system.web/trust' -name 'level' -value $targetLevel -ErrorAction Stop
+    } catch {
+        $messages.Add("Failed to set trust level to '$targetLevel'. Error: $($_.Exception.Message)")
+        return [PSCustomObject]@{
+            CISRef      = $cisRef
+            Description = $desc
+            Level       = $level
+            Before      = "trustLevel=$beforeVal"
+            After       = 'trustLevel=SetFailed'
+            Status      = 'Fail'
+            Messages    = $messages.ToArray()
+        }
+    }
 
     $afterVal = (Get-WebConfigurationProperty -pspath 'MACHINE/WEBROOT' -filter 'system.web/trust' -name 'level' -ErrorAction Stop).Value
     $messages.Add("After: trustLevel=$afterVal")

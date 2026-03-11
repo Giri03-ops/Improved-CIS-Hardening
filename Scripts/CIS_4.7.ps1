@@ -44,12 +44,25 @@ function Invoke-CIS4_7 {
         }
     }
 
-    Set-WebConfigurationProperty `
-        -pspath 'MACHINE/WEBROOT/APPHOST' `
-        -filter 'system.webServer/security/requestFiltering/fileExtensions' `
-        -name   'allowUnlisted' `
-        -value  $false `
-        -ErrorAction Stop
+    try {
+        Set-WebConfigurationProperty `
+            -pspath 'MACHINE/WEBROOT/APPHOST' `
+            -filter 'system.webServer/security/requestFiltering/fileExtensions' `
+            -name   'allowUnlisted' `
+            -value  $false `
+            -ErrorAction Stop
+    } catch {
+        $messages.Add("Failed to set allowUnlisted=False. Error: $($_.Exception.Message)")
+        return [PSCustomObject]@{
+            CISRef      = $cisRef
+            Description = $desc
+            Level       = $level
+            Before      = "allowUnlisted=$beforeVal"
+            After       = 'allowUnlisted=SetFailed'
+            Status      = 'Fail'
+            Messages    = $messages.ToArray()
+        }
+    }
 
     $afterVal = (Get-WebConfigurationProperty `
         -pspath 'MACHINE/WEBROOT/APPHOST' `

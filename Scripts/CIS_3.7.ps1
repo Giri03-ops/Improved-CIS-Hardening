@@ -44,12 +44,25 @@ function Invoke-CIS3_7 {
         }
     }
 
-    Set-WebConfigurationProperty `
-        -pspath 'MACHINE/WEBROOT/APPHOST' `
-        -filter 'system.web/httpCookies' `
-        -name   'httpOnlyCookies' `
-        -value  $true `
-        -ErrorAction Stop
+    try {
+        Set-WebConfigurationProperty `
+            -pspath 'MACHINE/WEBROOT/APPHOST' `
+            -filter 'system.web/httpCookies' `
+            -name   'httpOnlyCookies' `
+            -value  $true `
+            -ErrorAction Stop
+    } catch {
+        $messages.Add("Failed to set httpOnlyCookies=True. Error: $($_.Exception.Message)")
+        return [PSCustomObject]@{
+            CISRef      = $cisRef
+            Description = $desc
+            Level       = $level
+            Before      = "httpOnlyCookies=$beforeVal"
+            After       = 'httpOnlyCookies=SetFailed'
+            Status      = 'Fail'
+            Messages    = $messages.ToArray()
+        }
+    }
 
     $afterVal = (Get-WebConfigurationProperty `
         -pspath 'MACHINE/WEBROOT/APPHOST' `

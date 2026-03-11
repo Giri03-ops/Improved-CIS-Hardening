@@ -33,9 +33,10 @@ function Invoke-CIS2_4 {
         $siteName = $s.Name
 
         $cookielessProp = Get-WebConfigurationProperty `
-            -pspath "MACHINE/WEBROOT/APPHOST/$siteName" `
-            -filter 'system.web/authentication/forms' `
-            -name   'cookieless' `
+            -PSPath   'MACHINE/WEBROOT/APPHOST' `
+            -Location $siteName `
+            -Filter   'system.web/authentication/forms' `
+            -Name     'cookieless' `
             -ErrorAction SilentlyContinue
 
         if ($null -eq $cookielessProp) {
@@ -60,16 +61,26 @@ function Invoke-CIS2_4 {
             continue
         }
 
-        Set-WebConfigurationProperty `
-            -pspath "MACHINE/WEBROOT/APPHOST/$siteName" `
-            -filter 'system.web/authentication/forms' `
-            -name   'cookieless' `
-            -value  'UseCookies'
+        try {
+            Set-WebConfigurationProperty `
+                -PSPath   'MACHINE/WEBROOT/APPHOST' `
+                -Location $siteName `
+                -Filter   'system.web/authentication/forms' `
+                -Name     'cookieless' `
+                -Value    'UseCookies' `
+                -ErrorAction Stop
+        } catch {
+            $messages.Add("[$siteName] Failed to set cookieless=UseCookies. Error: $($_.Exception.Message)")
+            $anyFail = $true
+            $afterParts.Add("$siteName=SetFailed")
+            continue
+        }
 
         $postVal = [string](Get-WebConfigurationProperty `
-            -pspath "MACHINE/WEBROOT/APPHOST/$siteName" `
-            -filter 'system.web/authentication/forms' `
-            -name   'cookieless' `
+            -PSPath   'MACHINE/WEBROOT/APPHOST' `
+            -Location $siteName `
+            -Filter   'system.web/authentication/forms' `
+            -Name     'cookieless' `
             -ErrorAction SilentlyContinue).Value
         $messages.Add("[$siteName] Post-check: cookieless=$postVal")
         if ($postVal -ne 'UseCookies') { $anyFail = $true }

@@ -77,9 +77,15 @@ function Invoke-CIS1_6 {
         }
     }
 
+    $setFailures = [System.Collections.Generic.List[string]]::new()
     foreach ($pool in $appPools) {
-        Set-ItemProperty -Path "IIS:\AppPools\$pool" -Name passAnonymousToken -Value $true -ErrorAction Stop
-        $messages.Add("Set passAnonymousToken=True for: $pool")
+        try {
+            Set-ItemProperty -Path "IIS:\AppPools\$pool" -Name passAnonymousToken -Value $true -ErrorAction Stop
+            $messages.Add("Set passAnonymousToken=True for: $pool")
+        } catch {
+            $setFailures.Add($pool)
+            $messages.Add("Failed setting passAnonymousToken=True for '$pool'. Error: $($_.Exception.Message)")
+        }
     }
 
     # Post-check (coerce to bool to avoid provider-specific string/integer values)
@@ -95,6 +101,7 @@ function Invoke-CIS1_6 {
         if (-not $isEnabled) { $allGood = $false }
     }
 
+    if ($setFailures.Count -gt 0) { $allGood = $false }
     $status = if ($allGood) { 'Pass' } else { 'Fail' }
     return [PSCustomObject]@{
         CISRef      = $cisRef

@@ -44,12 +44,25 @@ function Invoke-CIS4_4 {
         }
     }
 
-    Set-WebConfigurationProperty `
-        -pspath 'MACHINE/WEBROOT/APPHOST' `
-        -filter 'system.webServer/security/requestFiltering' `
-        -name   'allowHighBitCharacters' `
-        -value  $false `
-        -ErrorAction Stop
+    try {
+        Set-WebConfigurationProperty `
+            -pspath 'MACHINE/WEBROOT/APPHOST' `
+            -filter 'system.webServer/security/requestFiltering' `
+            -name   'allowHighBitCharacters' `
+            -value  $false `
+            -ErrorAction Stop
+    } catch {
+        $messages.Add("Failed to set allowHighBitCharacters=False. Error: $($_.Exception.Message)")
+        return [PSCustomObject]@{
+            CISRef      = $cisRef
+            Description = $desc
+            Level       = $level
+            Before      = "allowHighBitCharacters=$beforeVal"
+            After       = 'allowHighBitCharacters=SetFailed'
+            Status      = 'Fail'
+            Messages    = $messages.ToArray()
+        }
+    }
 
     $afterVal = (Get-WebConfigurationProperty `
         -pspath 'MACHINE/WEBROOT/APPHOST' `
