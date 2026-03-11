@@ -95,7 +95,7 @@ if ($Timestamp -eq '') {
         exit 1
     }
     $Timestamp = $backupFolders[0].Name
-    Write-Info "No -Timestamp specified — using most recent: $Timestamp"
+    Write-Info "No -Timestamp specified - using most recent: $Timestamp"
 }
 
 $backupDir = Join-Path $backupsRoot $Timestamp
@@ -134,10 +134,10 @@ if ($hasIIS) {
     if (-not $iisRunning) {
         Write-Host '  [1] IIS config    : SKIP — IIS (W3SVC) not installed' -ForegroundColor Yellow
     } elseif (-not (Test-Path $iisNamed)) {
-        Write-Host "  [1] IIS config    : SKIP — IIS named backup 'CIS_$Timestamp' not found in inetsrv\backup\" -ForegroundColor Yellow
-        Write-Host '        (This backup was likely created when IIS was not installed, or was a -WhatIf run)'
+        Write-Host "  [1] IIS config    : SKIP - IIS named backup 'CIS_$Timestamp' not found in inetsrv\backup\" -ForegroundColor Yellow
+        Write-Host "        (This backup was likely created when IIS was not installed, or was a -WhatIf run)"
     } else {
-        Write-Host '  [1] IIS config    : SKIP — appcmd.exe not found' -ForegroundColor Yellow
+        Write-Host "  [1] IIS config    : SKIP - appcmd.exe not found" -ForegroundColor Yellow
     }
 }
 
@@ -145,7 +145,7 @@ if ($hasReg) {
     Write-Host "  [2] SCHANNEL reg  : WILL import $regFile" -ForegroundColor Green
     Write-Host '        reg import "..."'
 } else {
-    Write-Host "  [2] SCHANNEL reg  : SKIP — SCHANNEL_Registry.reg not found in backup folder" -ForegroundColor Yellow
+    Write-Host "  [2] SCHANNEL reg  : SKIP - SCHANNEL_Registry.reg not found in backup folder" -ForegroundColor Yellow
 }
 
 Write-Host ''
@@ -154,7 +154,7 @@ Write-Host '======================================================' -ForegroundC
 Write-Host ''
 
 if (-not $hasIIS -and -not $hasReg) {
-    Write-Err 'Nothing to restore — backup contains neither an IIS named backup nor a SCHANNEL .reg file.'
+    Write-Err "Nothing to restore - backup contains neither an IIS named backup nor a SCHANNEL .reg file."
     exit 1
 }
 
@@ -226,5 +226,5 @@ if ($anyError) {
 }
 Write-Host '======================================================' -ForegroundColor White
 Write-Host ''
-Write-Host '*** A system REBOOT is required for SCHANNEL changes to take effect. ***' -ForegroundColor Yellow
+Write-Host "*** A system REBOOT is required for SCHANNEL changes to take effect. ***" -ForegroundColor Yellow
 Write-Host ''
