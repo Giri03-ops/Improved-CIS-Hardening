@@ -31,8 +31,10 @@ function Invoke-CIS1_6 {
     foreach ($pool in $pools) {
         $poolName = $pool.Name
         $raw = Get-ItemProperty -Path "IIS:\AppPools\$poolName" -Name passAnonymousToken -ErrorAction SilentlyContinue
+        # Get-ItemProperty returns a rich object on the IIS provider; extract .Value
+        $rawValue = if ($raw -is [psobject] -and $null -ne $raw.Value) { $raw.Value } else { $raw }
         try {
-            $val = [System.Convert]::ToBoolean($raw)
+            $val = [System.Convert]::ToBoolean($rawValue)
         } catch {
             $val = $false
         }
@@ -88,8 +90,9 @@ function Invoke-CIS1_6 {
     foreach ($pool in $pools) {
         $poolName = $pool.Name
         $raw = Get-ItemProperty -Path "IIS:\AppPools\$poolName" -Name passAnonymousToken -ErrorAction SilentlyContinue
+        $rawValue = if ($raw -is [psobject] -and $null -ne $raw.Value) { $raw.Value } else { $raw }
         try {
-            $val = [System.Convert]::ToBoolean($raw)
+            $val = [System.Convert]::ToBoolean($rawValue)
         } catch {
             $val = $false
         }
